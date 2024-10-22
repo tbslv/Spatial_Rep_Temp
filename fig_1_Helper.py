@@ -215,8 +215,8 @@ class fig_1:
 		ax_warm.set_yticks(np.arange(data_warm_smooth.shape[0]) - 6)
 		ax_warm.set_yticklabels(['-'] * data_warm_smooth.shape[0], color='grey', fontsize=15)
 
-		ax_warm.yaxis.set_tick_params(pad=-3)
-		ax_warm.yaxis.set_tick_params(width=0)
+		ax_warm.yaxis.set_tick_self(pad=-3)
+		ax_warm.yaxis.set_tick_self(width=0)
 
 		# Set tick colors for warm data
 		for ticklabel, tickcolor in zip(ax_warm.get_yticklabels(), colors_warm):
@@ -237,8 +237,8 @@ class fig_1:
 		ax_cold.set_xticks([])
 		ax_cold.set_yticks(np.arange(data_cold_smooth.shape[0]) - 6)
 		ax_cold.set_yticklabels(['-'] * data_cold_smooth.shape[0], color='grey', fontsize=15)
-		ax_cold.yaxis.set_tick_params(pad=-3)
-		ax_cold.yaxis.set_tick_params(width=0)
+		ax_cold.yaxis.set_tick_self(pad=-3)
+		ax_cold.yaxis.set_tick_self(width=0)
 
 		# Set tick colors for cold data
 		for ticklabel, tickcolor in zip(ax_cold.get_yticklabels(), colors_cold):
@@ -260,8 +260,8 @@ class fig_1:
 
 		cax_2.set_ylabel('norm.\n Firing rate ')
 
-		cax.tick_params (axis='both', which='major', labelsize=7)
-		cax_2.tick_params (axis='both', which='major', labelsize=7)
+		cax.tick_self (axis='both', which='major', labelsize=7)
+		cax_2.tick_self (axis='both', which='major', labelsize=7)
 
 		# Set limits for cold and warm temperature axes
 		ax_temp_cold.set_ylim(21, 43)
@@ -316,7 +316,7 @@ class fig_1:
 
 	def make_data_fractions(self,ROIS=['VPL','PO','PoT'], resptypes=['cold','cold/warm','warm'],functional_type = 'putative_RS'):
 		pop_stats_all_cold = self.pop_stats_raw.loc[
-				(self.pop_stats_raw.ctype2.isin(resptypes))
+				(self.pop_stats_raw.ctype2.isin(resptypes[:-1]))
 				& (self.pop_stats_raw.stimtemp.isin(['22.0']))
 				& (self.pop_stats_raw.ROI.isin(ROIS))
 				& (self.pop_stats_raw.waveforms == 'clean')
@@ -327,7 +327,7 @@ class fig_1:
 
 			# Selection of warm stats
 		pop_stats_all_warm = self.pop_stats_raw.loc[
-				(self.pop_stats_raw.ctype2.isin(resptypes))
+				(self.pop_stats_raw.ctype2.isin(resptypes[1:]))
 				& (self.pop_stats_raw.stimtemp.isin(['42.0']))
 				& (self.pop_stats_raw.ROI.isin(ROIS))
 				& (self.pop_stats_raw.waveforms == 'clean')
@@ -352,4 +352,144 @@ class fig_1:
 		data.loc[data.ctype2.isin(['warm']),
 						 'new_type'] = 'warm'
 		return data
+
+	def bin_data(data, bin_size):
+	    data = data.reshape(data.shape[0], -1, bin_size)
+	    data = np.sum(data, axis=2)
+	    return data 
+
+	def plot_raster(data_tmp,ax1,trials,color='grey'):
+		for i in range(trials):
+			
+			dots_x = (data_tmp[:,0][data_tmp[:,1]==i]).astype(int)
+			dots = np.ones(dots_x.size)+i
+			ax1.scatter(dots_x,dots,s=.1,marker='|',color=color)
+		#cleanAxes(ax1,total=True)
+		#plt.show()
+		return
+
+	import numpy as np
+	import matplotlib.pyplot as plt
+	from scipy.ndimage import gaussian_filter1d
+
+	def plot_SU_examples(self, indices=[53, 95, 383, 539], 
+	                     trials=25, sweeplength=20, samplingrate=30000, 
+	                     binsize=1, sigma=30, xlim=(8000, 12000), ylim_temp=(21, 43), 
+	                     colors={'blue': 'blue', 'red': 'red'}, save_path=None):
+	    """
+	    Plots Single Unit (SU) examples with raster and PSTH plots.
+	    
+	    Parameters:
+	    - pop_stats_all: DataFrame containing the population statistics.
+	    - self: Object containing necessary parameters like rasters_raw.
+	    - fig_1: Object containing helper functions like bin_data and plot_raster.
+	    - indices: List of indices to plot (default is [53, 95, 383, 539]).
+	    - trials: Number of trials (default is 25).
+	    - sweeplength: Length of each sweep in seconds (default is 20).
+	    - samplingrate: Sampling rate in Hz (default is 30000).
+	    - binsize: Bin size for the raster in milliseconds (default is 1 ms).
+	    - sigma: Sigma value for Gaussian smoothing (default is 30).
+	    - xlim: X-axis limits for the plot (default is (8000, 12000)).
+	    - ylim_temp: Y-axis limits for the temperature plot (default is (21, 43)).
+	    - colors: Dictionary containing colors for plotting (default: {'blue': 'blue', 'red': 'red'}).
+	    - save_path: Path to save the figure (optional, default is None).
+	    
+	    Returns:
+	    - None: Displays the plots.
+	    """
+	    
+	    pop_stats_all_ind = self.pop_stats_raw.loc[
+	            (self.pop_stats_raw.ctype2.isin(['cold','cold/warm','warm']))
+	            #&(self.pop_stats_raw.responsive_sup_stim==False)
+	            &(self.pop_stats_raw.stimtemp.isin(['42.0','22.0']))
+	            &(self.pop_stats_raw.ROI.isin(['VPL','PO','PoT']))
+	            &(self.pop_stats_raw.waveforms=='clean')
+	            &(self.pop_stats_raw.quality=='good')
+	            &(~self.pop_stats_raw.animal_id.isin(self.outlier))
+	            #&(self.pop_stats_raw.combined_type=='cold/warm_fast_fast')
+	            #&(self.pop_stats_raw.onset_excitation <=  .5)
+	            #&(self.pop_stats_raw.responsetime_excitation >= 0)
+	            #&(self.pop_stats_raw.onset_excitation >= 0 )
+	            #&(self.pop_stats_raw.peak_fr_stim >  self.pop_stats_raw.peak_fr_offset)
+	            &(self.pop_stats_raw.functional_classification=='putative_RS'),'indexer'].unique()
+
+	    pop_stats_all = self.pop_stats_raw.loc[self.pop_stats_raw.indexer.isin(pop_stats_all_ind)]
+
+
+	    selection = pop_stats_all.loc[:,'indexer'].unique()
+
+	    
+	    for i in indices:
+	        selection_tmp = pop_stats_all.loc[(pop_stats_all.indexer == int(selection[i]))
+	                                          & (pop_stats_all.stimtemp.isin(['22.0', '42.0']))].index.values
+	        
+	        # Print peak firing rate for debugging purposes
+	        print(pop_stats_all.loc[(pop_stats_all.indexer == int(selection[i]))
+	                                & (pop_stats_all.stimtemp.isin(['22.0', '42.0'])),'peak_fr_stim'].values)
+	        print(i)
+
+	        # Raster Data Processing
+	        raster1 = self.rasters_raw[selection_tmp[0]]
+	        raster2 = self.rasters_raw[selection_tmp[-1]]
+
+	        raster_tmp1 = np.zeros([trials, int(sweeplength * samplingrate)])
+	        raster_tmp1[raster1[:, 1].astype(int), raster1[:, 0].astype(int)] = 1
+	        raster_binned1 = fig_1.bin_data(raster_tmp1, int(samplingrate * (binsize / 1000)))
+	        data_tmp_r1 = gaussian_filter1d(raster_binned1.mean(axis=0), sigma) * 1000
+
+	        raster_tmp2 = np.zeros([trials, int(sweeplength * samplingrate)])
+	        raster_tmp2[raster2[:, 1].astype(int), raster2[:, 0].astype(int)] = 1
+	        raster_binned2 = fig_1.bin_data(raster_tmp2, int(samplingrate * (binsize / 1000)))
+	        data_tmp_r2 = gaussian_filter1d(raster_binned2.mean(axis=0), sigma) * 1000
+
+	        # Plotting
+	        fig = plt.figure(figsize=(1, 1))
+	        ax_temp = placeAxesOnGrid(fig, yspan=[0, 0.1])
+	        ax_r1 = placeAxesOnGrid(fig, yspan=[0.7, 0.85])
+	        ax_r2 = placeAxesOnGrid(fig, yspan=[0.85, 1])
+	        ax_PSTH = placeAxesOnGrid(fig, yspan=[0, .7])
+
+	        # Temperature Plot
+	        ax_temp.set_xlim(*xlim)
+	        ax_temp.set_ylim(*ylim_temp)
+	        cleanAxes(ax_temp, total=True)
+
+	        # Raster Plot 1
+	        fig_1.plot_raster(raster1, ax_r1, trials, colors['blue'])
+	        ax_r1.set_xlim(xlim[0] * samplingrate // 1000, xlim[1] * samplingrate // 1000)
+	        cleanAxes(ax_r1, total=True)
+
+	        # Raster Plot 2
+	        fig_1.plot_raster(raster2, ax_r2, trials, colors['red'])
+	        ax_r2.set_xlim(xlim[0] * samplingrate // 1000, xlim[1] * samplingrate // 1000)
+	        cleanAxes(ax_r2, total=True)
+
+	        # PSTH Plot
+	        ax_PSTH.axvspan(9 * 1000, 11 * 1000, alpha=1, color='lightgrey')
+	        ax_PSTH.plot(data_tmp_r1, color=colors['blue'], lw=0.5)
+	        ax_PSTH.plot(data_tmp_r2, color=colors['red'], lw=0.5)
+	        ax_PSTH.set_xlim(*xlim)
+	        #cleanAxes(ax_PSTH, total=True)
+	        ax_PSTH.spines['left'].set_visible(True)
+	        ax_PSTH.spines['top'].set_visible(False)
+	        ax_PSTH.spines['right'].set_visible(False)
+	        ax_PSTH.spines['bottom'].set_visible(False)
+	        ax_PSTH.set_yticks([0, np.floor(np.max([data_tmp_r1, data_tmp_r2]))])
+	        ax_PSTH.set_yticklabels([str(0), str(int(np.floor(np.max([data_tmp_r1, data_tmp_r2]))))], fontsize=7)
+	        ax_PSTH.set_ylabel('Firing rate (Hz)')
+	        ax_PSTH.set_xticklabels([''])
+	        #
+
+	        # Add xlabel to the second raster plot
+	        ax_r2.set_xlabel('2 s', labelpad=3, fontsize=7)
+
+	        plt.tight_layout()
+
+	        # Save the plot if save_path is provided
+	        if save_path:
+	            plt.savefig(f"{save_path}/PSTH_CM_{i}_FINAL.svg", format='svg')
+
+	        # Show plot
+	        plt.show()
+
 		
